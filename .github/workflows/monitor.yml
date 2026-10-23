@@ -1,0 +1,57 @@
+name: MaizeTix IU vs Michigan monitor
+
+# Starts on push (and can be started manually). Two back-to-back jobs cover the
+# 12-hour window because a single GitHub Actions job is capped at 6 hours.
+# Each job checks every 10 minutes and stops on its own at STOP_AT.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: maizetix-monitor
+  cancel-in-progress: true
+
+env:
+  NTFY_TOPIC: preston-maizetix-iu-x7k2
+  OPPONENT: Indiana
+  INTERVAL_MIN: "10"
+  STOP_AT: "2026-10-24T11:35:00+00:00" # 7:35 AM ET Saturday
+  MAX_RUNTIME_MIN: "345"
+
+jobs:
+  first-half:
+    runs-on: ubuntu-latest
+    timeout-minutes: 358
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install playwright==1.48.0 && python -m playwright install --with-deps chromium
+      - run: python monitor.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: debug-first-half
+          path: debug/
+          if-no-files-found: ignore
+
+  second-half:
+    needs: first-half
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 358
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install playwright==1.48.0 && python -m playwright install --with-deps chromium
+      - run: python monitor.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: debug-second-half
+          path: debug/
+          if-no-files-found: ignore
